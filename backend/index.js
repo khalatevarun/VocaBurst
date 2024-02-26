@@ -118,12 +118,12 @@ wsServer.on("request", request => {
 
     const beginGame = (gameId) => {
         const game = games[gameId];
-        const clients = game.clients;
+        const gameClients = game.clients;
         const payload = {
             method: "status",
             state: {
-                onFocus: clients[1].clientId,
-                players : clients.map((client)=> { return { clientId: client.clientId, liveRemaining: 3  }})
+                onFocus: gameClients[1].clientId,
+                players : gameClients.map((client)=> { return { clientId: client.clientId, liveRemaining: 3  }})
             }
         }
 
@@ -132,24 +132,24 @@ wsServer.on("request", request => {
             clients[client.clientId].connection.send(JSON.stringify(payload));
         });
 
-        startQue();
+        startQue(gameId);
 
     }
 
     const startQue = (gameId, currentPlayerIndex = 0) => {
         const game = games[gameId];
-        const clients = game.clients;
+        const gameClients = game.clients;
         
         // Get the current player
-        const currentPlayer = clients[currentPlayerIndex];
-        const nextPlayerIndex = (currentPlayerIndex + 1) % clients.length; // Calculate index of next player
+        const currentPlayer = gameClients[currentPlayerIndex];
+        const nextPlayerIndex = (currentPlayerIndex + 1) % gameClients.length; // Calculate index of next player
         
         // Send status update to all clients
         const payload = {
             method: "status",
             state: {
-                onFocus: clients[nextPlayerIndex].clientId, // Next player gets focus
-                players: clients.map(client => ({
+                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
+                players: gameClients.map(client => ({
                     clientId: client.clientId,
                     liveRemaining: 3 // Assuming 3 lives for each player initially
                 }))
