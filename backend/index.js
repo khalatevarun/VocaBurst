@@ -56,10 +56,8 @@ wsServer.on("request", request => {
                 //max player reached
                 return;
             }
-            const color = {"0": "Red", "1":"Green", "2":"Blue"}[game.clients.length];
             game.clients.push({
                 "clientId": clientId,
-                "color": color
             });
 
             if(game.clients.length === 3){
@@ -79,24 +77,103 @@ wsServer.on("request", request => {
 
         }
 
+
         if(result.method === 'play'){
-            const clientId = result.clientId;
             const gameId = result.gameId;
-            const ballId = result.ballId;
-            const color = result.color;
+    const game = games[gameId];
 
-            let state = games[gameId].state;
+    // Initialize countdown variables
+    let countdown = 5;
+    let countdownInterval;
 
-            if(!state){
-                state = {};
-            }
+    // Function to send countdown updates to clients
+    function sendCountdownUpdate() {
+        const payload = {
+            method: 'countdown',
+            countdown: countdown
+        };
 
-            state[ballId] = color;
-            games[gameId].state = state;
+        // Send countdown update to all clients in the game
+        game.clients.forEach(client => {
+            clients[client.clientId].connection.send(JSON.stringify(payload));
+        });
 
+        // Decrement countdown
+        countdown--;
+
+        // If countdown reaches 0, clear the interval
+        if (countdown < 0) {
+            clearInterval(countdownInterval);
+            // Start your game logic here after countdown reaches 0
+            beginGame(gameId);
+        }
+    }
+
+    // Start countdown timer
+    countdownInterval = setInterval(sendCountdownUpdate, 1000);
         }
 
+
     })
+
+    const beginGame = (gameId) => {
+        const game = games[gameId];
+        const clients = game.clients;
+        const payload = {
+            method: "status",
+            state: {
+                onFocus: clients[1].clientId,
+                players : clients.map((client)=> { return { clientId: client.clientId, liveRemaining: 3  }})
+            }
+        }
+
+         // Send countdown update to all clients in the game
+         game.clients.forEach(client => {
+            clients[client.clientId].connection.send(JSON.stringify(payload));
+        });
+
+        startQue();
+
+    }
+
+    const startQue = (gameId, currentPlayerIndex = 0) => {
+        const game = games[gameId];
+        const clients = game.clients;
+        
+        // Get the current player
+        const currentPlayer = clients[currentPlayerIndex];
+        const nextPlayerIndex = (currentPlayerIndex + 1) % clients.length; // Calculate index of next player
+        
+        // Send status update to all clients
+        const payload = {
+            method: "status",
+            state: {
+                onFocus: clients[nextPlayerIndex].clientId, // Next player gets focus
+                players: clients.map(client => ({
+                    clientId: client.clientId,
+                    liveRemaining: 3 // Assuming 3 lives for each player initially
+                }))
+            }
+        };
+    
+        // Send status update to all clients
+        game.clients.forEach(client => {
+            clients[client.clientId].connection.send(JSON.stringify(payload));
+        });
+    
+        // Start a timer for the current player
+        setTimeout(() => {
+            // If there are more players, continue the queue
+            if (nextPlayerIndex !== currentPlayerIndex) {
+                startQue(gameId, nextPlayerIndex);
+            } else {
+                // If this was the last player, start the game logic or next phase
+                // For example, you can call another function here to start the game logic
+                // beginGameLogic(gameId);
+            }
+        }, 5000); // 5000 milliseconds = 5 seconds
+    };
+    
 
 
     function updateGameState(){

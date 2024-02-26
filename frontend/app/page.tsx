@@ -16,7 +16,8 @@ export default function Home() {
   const router = useRouter();
   const [ gameJoined, setGameJoined ] =  useState(false);
   const [ players, setPlayers ] = useState([]);
-  const [ game, setGame ] = useState();
+  const [ gameState, setGameState ] = useState({});
+  const [countDown, setCountDown] = useState('');
   // const webSocketRef = useRef();
 
   // webSocketRef.current
@@ -43,6 +44,15 @@ export default function Home() {
 
   }
 
+  const startGame = () => {
+    const payload = {
+      method: "play",
+      gameId: gameId
+    };
+
+    ws.send(JSON.stringify(payload));
+  }
+
     ws.onmessage = message => {
       const response = JSON.parse(message.data);
       console.log(response);
@@ -62,6 +72,21 @@ export default function Home() {
         setGameJoined(true);
         setPlayers(clients);
       }
+
+      if(response.method === 'state'){
+        const state = response.state;
+        setGameState(state);
+      }
+
+      if(response.method === 'countdown'){
+        const countdown = response.countdown;
+        setCountDown(countdown);
+      }
+
+      if(response.method === 'status'){
+        console.log(response);
+      }
+
     }
     
 
@@ -83,6 +108,8 @@ export default function Home() {
     const playGame = () => {
       return (
         <>
+          <Button onClick={startGame}  buttonText='Start Game' />
+          <p>Game starts in ${countDown}</p>
           <div>
           {players.map((player) => <div>{player.clientId}</div>)}
           </div>
