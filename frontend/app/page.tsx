@@ -2,11 +2,12 @@
 import Image from "next/image";
 import styles from "./page.module.css";
 import Link from "next/link";
-import Input from "@/components/Input";
-import Button from "@/components/Button";
+import Input from "@/common/components/Input";
+import Button from "@/common/components/Button";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setStorage } from "@/utils";
+import { setStorage } from "@/common/utils";
+import { METHOD } from "@/common/utils/constants";
 
 export default function Home() {
  
@@ -15,7 +16,7 @@ export default function Home() {
   const [ws, setWs] = useState(new WebSocket("ws://localhost:9090"));
   const router = useRouter();
   const [ gameJoined, setGameJoined ] =  useState(false);
-  const [ players, setPlayers ] = useState([]);
+  const [ players, setPlayers ] = useState<string[]>([]);
   const [ gameState, setGameState ] = useState({});
   const [countDown, setCountDown] = useState('');
   // const webSocketRef = useRef();
@@ -26,7 +27,7 @@ export default function Home() {
   const createGame = () => {
     console.log("cliceedddd");
     const payload = {
-      "method": "create",
+      "method": METHOD.CREATE,
       "clientId": clientId
   }
 
@@ -35,7 +36,7 @@ export default function Home() {
 
   const joinGame = () => {
     const payload = {
-      "method": "join",
+      "method": METHOD.JOIN,
       "clientId": clientId,
       "gameId": gameId,
   };
@@ -46,7 +47,7 @@ export default function Home() {
 
   const startGame = () => {
     const payload = {
-      method: "play",
+      method: METHOD.PLAY,
       gameId: gameId
     };
 
@@ -56,35 +57,40 @@ export default function Home() {
     ws.onmessage = message => {
       const response = JSON.parse(message.data);
       console.log(response);
+
+      const responseMethod = response.method;
+
+      switch(responseMethod){
       
       //connect
-      if(response.method === "connect"){
+      case METHOD.CONNECT: {
         setClientId(response.clientId);
+        break;
       }
   
-      if(response.method === "create"){
+      case METHOD.CREATE: {
         setGameId(response.game.id);  
+        break;
       }
 
-      if(response.method === "join"){
+      case METHOD.JOIN : {
         const game = response.game;
         const clients = game.clients;
         setGameJoined(true);
         setPlayers(clients);
+        break;
       }
 
-      if(response.method === 'state'){
+      case METHOD.STATUS: {
         const state = response.state;
         setGameState(state);
+        break;
       }
 
-      if(response.method === 'countdown'){
+      case METHOD.COUNTDOWN: {
         const countdown = response.countdown;
         setCountDown(countdown);
-      }
-
-      if(response.method === 'status'){
-        console.log(response);
+        break;
       }
 
     }
@@ -99,7 +105,7 @@ export default function Home() {
           </div>
         <div style={{display:'flex', gap:'20px', alignItems:'center'}}>
           <Button onClick={joinGame}  buttonText='Join Game' />
-          <Input onInputChange={(e)=>setGameId(e.target.value)} value={gameId}/>
+          <Input onInputChange={(e:any)=>setGameId(e.target.value)} value={gameId}/>
         </div>
         </>
       )

@@ -12,6 +12,7 @@ const wsServer = new websocketServer({
 
 // get uuid lib to generate unique id
 const { v4: uuidv4 } = require('uuid');
+const { METHOD } = require("./constants");
 
 
 const clients = {};
@@ -30,7 +31,7 @@ wsServer.on("request", request => {
 
         switch(requestMethod){
 
-        case METHODS.CREATE :
+        case METHOD.CREATE :
         {
             const requestClientId = result.clientId;
             const gameId = uuidv4();
@@ -40,7 +41,7 @@ wsServer.on("request", request => {
                 }
 
             const payload = {
-                "method": METHODS.CREATE,
+                "method": METHOD.CREATE,
                 "gameId": games[gameId]
             }
 
@@ -51,7 +52,7 @@ wsServer.on("request", request => {
         
 
         // client makes a join request
-            case METHODS.JOIN :
+            case METHOD.JOIN :
         {
             
             const clientId = result.clientId;
@@ -63,7 +64,7 @@ wsServer.on("request", request => {
             });
 
             const payload = {
-                "method":METHODS.JOIN,
+                "method":METHOD.JOIN,
                 "game":currentGame,
             }
 
@@ -75,7 +76,7 @@ wsServer.on("request", request => {
         }
 
 
-        case METHODS.PLAY: 
+        case METHOD.PLAY: 
         {
             const gameId = result.gameId;
     const game = games[gameId];
@@ -87,7 +88,7 @@ wsServer.on("request", request => {
     // Function to send countdown updates to clients
     function sendCountdownUpdate() {
         const payload = {
-            method: METHODS.COUNTDOWN,
+            method: METHOD.COUNTDOWN,
             countdown: countdown
         };
 
@@ -118,7 +119,7 @@ wsServer.on("request", request => {
         const game = games[gameId];
         const gameClients = game.clients;
         const payload = {
-            method: METHODS.STATUS,
+            method: METHOD.STATUS,
             state: {
                 onFocus: gameClients[0].clientId,
                 players : gameClients.map((client)=> { return { clientId: client.clientId, liveRemaining: 3  }})
@@ -147,7 +148,7 @@ wsServer.on("request", request => {
         
         // Send status update to all clients
         const payload = {
-            method: METHODS.STATUS,
+            method: METHOD.STATUS,
             state: {
                 onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
                 players: gameClients.map(client => ({
@@ -170,7 +171,7 @@ wsServer.on("request", request => {
     }
 
     const payload = {
-        "method": METHODS.CONNECT,
+        "method": METHOD.CONNECT,
         "clientId": clientId
     };
 
