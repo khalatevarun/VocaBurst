@@ -26,59 +26,57 @@ wsServer.on("request", request => {
         const result = JSON.parse(message.utf8Data);
         console.log(result);
 
-        if (result.method === 'create'){
+        const requestMethod = result.method;
+
+        switch(requestMethod){
+
+        case METHODS.CREATE :
+        {
             const requestClientId = result.clientId;
             const gameId = uuidv4();
                 games[gameId] = {
                     "id": gameId,
-                    "balls": 20,
                     "clients":[]
                 }
 
             const payload = {
-                "method": "create",
-                "game": games[gameId]
+                "method": METHODS.CREATE,
+                "gameId": games[gameId]
             }
 
             const con = clients[requestClientId].connection;
             con.send(JSON.stringify(payload));
+            break;
         }
+        
 
         // client makes a join request
-        if (result.method === 'join'){
+            case METHODS.JOIN :
+        {
             
             const clientId = result.clientId;
             const gameId = result.gameId;
-            const game = games[gameId];
+            const currentGame = games[gameId];
 
-            if(game.clients.length >= 3)
-            {
-                //max player reached
-                return;
-            }
-            game.clients.push({
+            currentGame.clients.push({
                 "clientId": clientId,
             });
 
-            if(game.clients.length === 3){
-                updateGameState();
-            }
-
-
             const payload = {
-                "method":"join",
-                "game":game,
+                "method":METHODS.JOIN,
+                "game":currentGame,
             }
 
             // loop through all clients
-            game.clients.forEach(c => {
+            currentGame.clients.forEach(c => {
                 clients[c.clientId].connection.send(JSON.stringify(payload));
-            });
-
+            }); 
+            break;
         }
 
 
-        if(result.method === 'play'){
+        case METHODS.PLAY: 
+        {
             const gameId = result.gameId;
     const game = games[gameId];
 
@@ -89,7 +87,7 @@ wsServer.on("request", request => {
     // Function to send countdown updates to clients
     function sendCountdownUpdate() {
         const payload = {
-            method: 'countdown',
+            method: METHODS.COUNTDOWN,
             countdown: countdown
         };
 
@@ -111,18 +109,18 @@ wsServer.on("request", request => {
 
     // Start countdown timer
     countdownInterval = setInterval(sendCountdownUpdate, 1000);
+    break;
         }
-
-
-    })
+    }
+});
 
     const beginGame = (gameId) => {
         const game = games[gameId];
         const gameClients = game.clients;
         const payload = {
-            method: "status",
+            method: METHODS.STATUS,
             state: {
-                onFocus: gameClients[1].clientId,
+                onFocus: gameClients[0].clientId,
                 players : gameClients.map((client)=> { return { clientId: client.clientId, liveRemaining: 3  }})
             }
         }
@@ -132,7 +130,10 @@ wsServer.on("request", request => {
             clients[client.clientId].connection.send(JSON.stringify(payload));
         });
 
-        startQue(gameId);
+         // Start a timer for the current player
+         setInterval(() => {
+            startQue(gameId, 1);
+        }, 5000); // 5000 milliseconds = 5 seconds
 
     }
 
@@ -146,7 +147,7 @@ wsServer.on("request", request => {
         
         // Send status update to all clients
         const payload = {
-            method: "status",
+            method: METHODS.STATUS,
             state: {
                 onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
                 players: gameClients.map(client => ({
@@ -160,43 +161,8 @@ wsServer.on("request", request => {
         game.clients.forEach(client => {
             clients[client.clientId].connection.send(JSON.stringify(payload));
         });
-    
-        // Start a timer for the current player
-        setTimeout(() => {
-            // If there are more players, continue the queue
-            if (nextPlayerIndex !== currentPlayerIndex) {
-                startQue(gameId, nextPlayerIndex);
-            } else {
-                // If this was the last player, start the game logic or next phase
-                // For example, you can call another function here to start the game logic
-                // beginGameLogic(gameId);
-            }
-        }, 5000); // 5000 milliseconds = 5 seconds
     };
-    
-
-
-    function updateGameState(){
-
         
-        for(const g of Object.keys(games)) {
-
-            const game = games[g];
-
-            const payload = {
-                "method": "update",
-                "game":game,
-            }
-            games[g].clients.forEach((c) => {
-
-                clients[c.clientId].connection.send(JSON.stringify(payload));
-            })
-        }
-
-        setTimeout(updateGameState, 500);
-
-    }
-    
     // generate a new clientId
     const clientId = uuidv4();
     clients[clientId] = {
@@ -204,7 +170,7 @@ wsServer.on("request", request => {
     }
 
     const payload = {
-        "method": "connect",
+        "method": METHODS.CONNECT,
         "clientId": clientId
     };
 
