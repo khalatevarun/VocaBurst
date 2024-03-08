@@ -1,6 +1,5 @@
 const Button = (props:any) => {
     const { onClick, buttonText } = props;
-    console.log(onClick);
     return (
         <button 
             

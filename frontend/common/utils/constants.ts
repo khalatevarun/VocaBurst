@@ -5,4 +5,5 @@ export const METHOD = {
     COUNTDOWN: 'countdown',
     STATUS: 'status',
     CONNECT: 'connect',
+    TYPING: 'typing',
 }

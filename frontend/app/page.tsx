@@ -1,12 +1,8 @@
 "use client";
-import Image from "next/image";
-import styles from "./page.module.css";
-import Link from "next/link";
 import Input from "@/common/components/Input";
 import Button from "@/common/components/Button";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { setStorage } from "@/common/utils";
 import { METHOD } from "@/common/utils/constants";
 
 export default function Home() {
@@ -18,6 +14,7 @@ export default function Home() {
   const [ gameJoined, setGameJoined ] =  useState(false);
   const [ players, setPlayers ] = useState<string[]>([]);
   const [ gameState, setGameState ] = useState({});
+  const [typing, setTyping] = useState('');
   const [countDown, setCountDown] = useState('');
   // const webSocketRef = useRef();
 
@@ -69,7 +66,7 @@ export default function Home() {
       }
   
       case METHOD.CREATE: {
-        setGameId(response.game.id);  
+        setGameId(response.gameId);  
         break;
       }
 
@@ -82,7 +79,7 @@ export default function Home() {
       }
 
       case METHOD.STATUS: {
-        const state = response.state;
+        const state = response.game.state;
         setGameState(state);
         break;
       }
@@ -93,7 +90,41 @@ export default function Home() {
         break;
       }
 
+      case METHOD.TYPING: {
+        setTyping(response.typing);
+        break;
+      }
+
     }
+  }
+
+  const debounce = (func:any, delay:any) => {
+    let timerId:any;
+    return function(...args) {
+        const context:any = this;
+        clearTimeout(timerId);
+        timerId = setTimeout(() => {
+            func.apply(context, args);
+        }, delay);
+    };
+};
+
+const typeUpdate = (e:any) => {
+  const value = e.target.value;
+  const payload = {
+      "method": METHOD.TYPING,
+      "clientId": clientId,
+      "gameId": gameId,
+      "typing": value
+  };
+
+  ws.send(JSON.stringify(payload));
+};
+
+const debouncedTypeUpdate = debounce(typeUpdate, 300); // Adjust debounce time as needed (300 milliseconds in this example)
+
+
+  
     
 
     const getOnboardUI = () => {
@@ -115,10 +146,17 @@ export default function Home() {
       return (
         <>
           <Button onClick={startGame}  buttonText='Start Game' />
-          <p>Game starts in ${countDown}</p>
+          <p>Game starts in {countDown}</p>
           <div>
-          {players.map((player) => <div>{player.clientId}</div>)}
+          {players.map((player) => (
+          <div>
+            {player.clientId === clientId && <span>{'YOU -> '}</span>}
+            {player.clientId}
+            </div>
+          ))}
+          { clientId === gameState?.onFocus && <Input onInputChange={debouncedTypeUpdate} /> }
           </div>
+          <div>{typing}</div>
         </>
       )
     }
@@ -126,7 +164,7 @@ export default function Home() {
 
   return (
     <div style={{display:'flex',flexDirection:'column', gap:'20px', alignItems:'center', justifyContent:'center', height:'100vh'}}>
-      <div>Vocabust!</div>
+      <div>Vocaburst!</div>
       {gameJoined ? playGame(): getOnboardUI()}
     </div>
   );

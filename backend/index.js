@@ -17,6 +17,7 @@ const { METHOD } = require("./constants");
 
 const clients = {};
 const games = {};
+// const rand
 
 wsServer.on("request", request => {
     // connect
@@ -42,7 +43,7 @@ wsServer.on("request", request => {
 
             const payload = {
                 "method": METHOD.CREATE,
-                "gameId": games[gameId]
+                "gameId": gameId
             }
 
             const con = clients[requestClientId].connection;
@@ -112,57 +113,74 @@ wsServer.on("request", request => {
     countdownInterval = setInterval(sendCountdownUpdate, 1000);
     break;
         }
+
+
+        case METHOD.TYPING: {
+
+            const typing = result.typing;
+            const gameId = result.gameId;
+            const currentGame = games[gameId];
+
+            const payload = {
+                method: METHOD.TYPING,
+                typing: typing,
+            };
+    
+            currentGame.clients.forEach(client => {
+                clients[client.clientId].connection.send(JSON.stringify(payload));
+            });
+
+            break;
+        }
+
+        case METHOD.DIFFUSE: {
+            const word = result.word;
+            const gameId = result.gameId;
+            const currentGame = games[gameId];
+        
+            const containsSubstring = word.includes(currentGame.prompt);
+            const validWords = substringWordMap[currentGame.prompt] || [];
+            const isValidWord = validWords.includes(word);
+        
+            if (containsSubstring && isValidWord) {
+                // Reset the timer
+                clearInterval(currentGame.countdownInterval);
+        
+                // Update onFocus to the next player ID
+                const currentPlayerIndex = currentGame.clients.findIndex(client => client.clientId === currentGame.state.onFocus);
+                const nextPlayerIndex = (currentPlayerIndex + 1) % currentGame.clients.length;
+                currentGame.state.onFocus = currentGame.clients[nextPlayerIndex].clientId;
+        
+                // Start a new timer
+                currentGame.countdownInterval = setInterval(sendCountdownUpdate, 1000);
+            } else {
+                // Decrease the lives of the current player if the word is invalid
+                currentGame.clients.forEach(client => {
+                    if (client.clientId === currentGame.state.onFocus) {
+                        client.liveRemaining--;
+                    }
+                });
+        
+                // Send game update to all clients
+                const payload = {
+                    method: METHOD.DIFFUSE,
+                    game: currentGame,
+                };
+        
+                currentGame.clients.forEach(client => {
+                    clients[client.clientId].connection.send(JSON.stringify(payload));
+                });
+            }
+            break;
+        }
+        
     }
 });
 
-    const beginGame = (gameId) => {
-        const game = games[gameId];
-        const gameClients = game.clients;
-        const payload = {
-            method: METHOD.STATUS,
-            state: {
-                onFocus: gameClients[0].clientId,
-                players : gameClients.map((client)=> { return { clientId: client.clientId, liveRemaining: 3  }})
-            }
-        }
+   
 
-         // Send countdown update to all clients in the game
-         game.clients.forEach(client => {
-            clients[client.clientId].connection.send(JSON.stringify(payload));
-        });
 
-         // Start a timer for the current player
-         setInterval(() => {
-            startQue(gameId, 1);
-        }, 5000); // 5000 milliseconds = 5 seconds
 
-    }
-
-    const startQue = (gameId, currentPlayerIndex = 0) => {
-        const game = games[gameId];
-        const gameClients = game.clients;
-        
-        // Get the current player
-        const currentPlayer = gameClients[currentPlayerIndex];
-        const nextPlayerIndex = (currentPlayerIndex + 1) % gameClients.length; // Calculate index of next player
-        
-        // Send status update to all clients
-        const payload = {
-            method: METHOD.STATUS,
-            state: {
-                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
-                players: gameClients.map(client => ({
-                    clientId: client.clientId,
-                    liveRemaining: 3 // Assuming 3 lives for each player initially
-                }))
-            }
-        };
-    
-        // Send status update to all clients
-        game.clients.forEach(client => {
-            clients[client.clientId].connection.send(JSON.stringify(payload));
-        });
-    };
         
     // generate a new clientId
     const clientId = uuidv4();
@@ -181,3 +199,124 @@ wsServer.on("request", request => {
 
 
 });
+
+const beginGame = (gameId) => {
+    const game = games[gameId];
+    const gameClients = game.clients;
+    let currentPlayerIndex = 0;
+
+    // Function to send status update to all clients
+    const sendStatusUpdate = () => {
+        console.log("Current player index:", currentPlayerIndex);
+
+        // Check if the game has started
+    if (game.gameStarted) {
+        const currentPlayer = game.state.players.find(client => client.clientId === game.state.onFocus);
+        currentPlayer.liveRemaining--; // Decrement liveRemaining of the current player
+        console.log("game started",game);
+        // Check if the current player has no remaining lives
+        if (currentPlayer.liveRemaining <= 0) {
+            // Handle the case where the current player has no remaining lives (e.g., remove player from the game)
+        }
+    } 
+
+        let nextPlayerIndex;
+        if (gameClients.length === 2) {
+            // If there are only two players, switch between them
+            nextPlayerIndex = currentPlayerIndex === 0 ? 1 : 0;
+        } else {
+            // For more than two players, calculate the next player index using modular arithmetic
+            nextPlayerIndex = (currentPlayerIndex + 1) % gameClients.length;
+        }
+
+        game.promt = generateRandomSubstring();
+        if(game.gameStarted){
+            game.state = {
+                prompt: game.promt,
+                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
+                players: game.state.players
+            }
+
+            console.log("on focus game started>>>", gameClients[nextPlayerIndex].clientId, nextPlayerIndex, game);
+
+        }
+        else {
+            game.state = {
+                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
+                players: gameClients.map(client => ({
+                    clientId: client.clientId,
+                    liveRemaining: 3 // Assuming 3 lives for each player initially
+                })),
+                prompt: game.promt
+        }
+
+        console.log("on focus game to start>>>", gameClients[nextPlayerIndex].clientId, nextPlayerIndex, game);
+
+
+      
+        }
+
+        // Construct payload for status update
+        const payload = {
+            method: METHOD.STATUS,
+            game: game 
+        };
+
+        // Send status update to all clients
+        game.clients.forEach(client => {
+            clients[client.clientId].connection.send(JSON.stringify(payload));
+        });
+
+        // Update currentPlayerIndex for the next turn
+        currentPlayerIndex = nextPlayerIndex;
+        game.gameStarted = true;
+    };
+
+    // Send initial status update to all clients
+    sendStatusUpdate();
+
+    // Start the countdown for the game
+    game.countdownInterval = setInterval(sendStatusUpdate, 5000); // 5000 milliseconds = 5 seconds
+
+};
+
+
+
+const fs = require('fs');
+
+// Load the dictionary file
+const dictionaryData = fs.readFileSync(__dirname + '/dictionary.txt', 'utf8');
+const dictionary = dictionaryData.split('\n');
+
+// Preprocess the dictionary to create a map of consecutive letter pairs to words
+const substringWordMap = {};
+for (const word of dictionary) {
+    for (let i = 0; i < word.length - 1; i++) {
+        const substring = word.slice(i, i + 2).toLowerCase(); // Convert to lowercase for case-insensitive matching
+        if (!substringWordMap[substring]) {
+            substringWordMap[substring] = [];
+        }
+        substringWordMap[substring].push(word);
+    }
+}
+
+// Function to generate a random two-letter substring for which at least one word exists
+function generateRandomSubstring() {
+    const substrings = Object.keys(substringWordMap);
+    let randomSubstring;
+    do {
+        randomSubstring = substrings[Math.floor(Math.random() * substrings.length)];
+    } while (substringWordMap[randomSubstring].length === 0); // Ensure at least one word exists for the substring
+    return randomSubstring;
+}
+
+// Main function
+function main() {
+    const randomSubstring = generateRandomSubstring();
+    console.log("Substring to find:", randomSubstring);
+    const userInput = 'asd';
+  
+}
+
+// Call the main function
+main();
