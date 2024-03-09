@@ -12,7 +12,7 @@ const wsServer = new websocketServer({
 
 // get uuid lib to generate unique id
 const { v4: uuidv4 } = require('uuid');
-const { METHOD } = require("./constants");
+const { METHOD, GAME_STATUS } = require("./constants");
 
 
 const clients = {};
@@ -210,13 +210,14 @@ const beginGame = (gameId) => {
         console.log("Current player index:", currentPlayerIndex);
 
         // Check if the game has started
-    if (game.gameStarted) {
+    if (game.status === GAME_STATUS.STARTED) {
         const currentPlayer = game.state.players.find(client => client.clientId === game.state.onFocus);
         currentPlayer.liveRemaining--; // Decrement liveRemaining of the current player
         console.log("game started",game);
         // Check if the current player has no remaining lives
-        if (currentPlayer.liveRemaining <= 0) {
+        if (currentPlayer.liveRemaining === 0) {
             // Handle the case where the current player has no remaining lives (e.g., remove player from the game)
+            game.status = GAME_STATUS.FINISHED;
         }
     } 
 
@@ -230,7 +231,7 @@ const beginGame = (gameId) => {
         }
 
         game.promt = generateRandomSubstring();
-        if(game.gameStarted){
+        if(game.status === GAME_STATUS.STARTED){
             game.state = {
                 prompt: game.promt,
                 onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
@@ -238,6 +239,15 @@ const beginGame = (gameId) => {
             }
 
             console.log("on focus game started>>>", gameClients[nextPlayerIndex].clientId, nextPlayerIndex, game);
+
+        }
+
+        else if (game.status === GAME_STATUS.FINISHED){
+            game.state = {
+                prompt: game.promt,
+                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
+                players: game.state.players
+            }
 
         }
         else {
@@ -269,14 +279,20 @@ const beginGame = (gameId) => {
 
         // Update currentPlayerIndex for the next turn
         currentPlayerIndex = nextPlayerIndex;
-        game.gameStarted = true;
+
+        if(game.status === GAME_STATUS.FINISHED){
+            clearInterval(game.countdownInterval);
+            return;
+        }
     };
 
     // Send initial status update to all clients
     sendStatusUpdate();
 
     // Start the countdown for the game
+    game.status = GAME_STATUS.STARTED;
     game.countdownInterval = setInterval(sendStatusUpdate, 5000); // 5000 milliseconds = 5 seconds
+
 
 };
 

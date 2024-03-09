@@ -6,4 +6,5 @@ export const METHOD = {
     STATUS: 'status',
     CONNECT: 'connect',
     TYPING: 'typing',
+    DIFFUSE: 'diffuse'
 }

@@ -1,7 +1,7 @@
 "use client";
 import Input from "@/common/components/Input";
 import Button from "@/common/components/Button";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { METHOD } from "@/common/utils/constants";
 
@@ -16,9 +16,41 @@ export default function Home() {
   const [ gameState, setGameState ] = useState({});
   const [typing, setTyping] = useState('');
   const [countDown, setCountDown] = useState('');
+  const [ guess, setGuess ] = useState('');
   // const webSocketRef = useRef();
 
   // webSocketRef.current
+
+  console.log("game id>>>>", gameId);
+
+
+  const submitGuess =  useCallback(() => {
+    const payload = {
+      "method": METHOD.DIFFUSE,
+      "gameId": gameId,
+      "word": guess
+    }
+    ws.send(JSON.stringify(payload));
+    console.log(JSON.stringify(payload), gameId, guess)
+  },[gameId, guess])
+
+  useEffect(() => {
+    const handleKeyPress = (event:any) => {
+      if (event.key === 'Enter') {
+        // Your logic here for handling Enter key press
+        console.log('Enter key pressed');
+        submitGuess();
+      }
+    
+  }
+  document.body.addEventListener('keydown', handleKeyPress);
+
+  // Cleanup function to remove the event listener when the component unmounts
+  return () => {
+    document.body.removeEventListener('keydown', handleKeyPress);
+  };
+},[submitGuess]);
+  
 
 
   const createGame = () => {
@@ -79,7 +111,7 @@ export default function Home() {
       }
 
       case METHOD.STATUS: {
-        const state = response.game.state;
+        const state = response.game;
         setGameState(state);
         break;
       }
@@ -94,6 +126,8 @@ export default function Home() {
         setTyping(response.typing);
         break;
       }
+
+    
 
     }
   }
@@ -121,7 +155,11 @@ const typeUpdate = (e:any) => {
   ws.send(JSON.stringify(payload));
 };
 
-const debouncedTypeUpdate = debounce(typeUpdate, 300); // Adjust debounce time as needed (300 milliseconds in this example)
+const debouncedTypeUpdate = (e:any) => {
+  setGuess(e.target.value)
+
+debounce((e:any)=>typeUpdate(e), 300); // Adjust debounce time as needed (300 milliseconds in this example)
+}
 
 
   
@@ -138,6 +176,8 @@ const debouncedTypeUpdate = debounce(typeUpdate, 300); // Adjust debounce time a
           <Button onClick={joinGame}  buttonText='Join Game' />
           <Input onInputChange={(e:any)=>setGameId(e.target.value)} value={gameId}/>
         </div>
+
+       
         </>
       )
     }
@@ -154,9 +194,15 @@ const debouncedTypeUpdate = debounce(typeUpdate, 300); // Adjust debounce time a
             {player.clientId}
             </div>
           ))}
-          { clientId === gameState?.onFocus && <Input onInputChange={debouncedTypeUpdate} /> }
+          { clientId === gameState?.state?.onFocus && <Input value={guess} onInputChange={debouncedTypeUpdate} /> }
           </div>
           <div>{typing}</div>
+
+          <div>
+          WINNER IS:
+          {console.log(gameState)}
+          {gameState.status === 'FINISHED' &&  <span>{gameState.state?.onFocus}</span>}
+        </div>
         </>
       )
     }

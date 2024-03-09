@@ -5,9 +5,17 @@ const METHOD = {
     COUNTDOWN: 'countdown',
     STATUS: 'status',
     CONNECT: 'connect',
-    TYPING: 'typing'
+    TYPING: 'typing',
+    DIFFUSE: 'diffuse'
+}
+
+const GAME_STATUS = {
+  READY: 'READY',
+  STARTED: 'STARTED',
+  FINISHED: 'FINISHED'
 }
 
 module.exports = {
-  METHOD  
+  METHOD ,
+  GAME_STATUS 
 };
