@@ -134,12 +134,13 @@ wsServer.on("request", request => {
         }
 
         case METHOD.DIFFUSE: {
-            const word = result.word;
+            const word = result.word.toUpperCase();
             const gameId = result.gameId;
             const currentGame = games[gameId];
+            
         
-            const containsSubstring = word.includes(currentGame.prompt);
-            const validWords = substringWordMap[currentGame.prompt] || [];
+            const containsSubstring = word.includes(currentGame.state.prompt);
+            const validWords = substringWordMap[currentGame.state.prompt.toLowerCase()] || [];
             const isValidWord = validWords.includes(word);
         
             if (containsSubstring && isValidWord) {
@@ -147,30 +148,14 @@ wsServer.on("request", request => {
                 clearInterval(currentGame.countdownInterval);
         
                 // Update onFocus to the next player ID
-                const currentPlayerIndex = currentGame.clients.findIndex(client => client.clientId === currentGame.state.onFocus);
-                const nextPlayerIndex = (currentPlayerIndex + 1) % currentGame.clients.length;
-                currentGame.state.onFocus = currentGame.clients[nextPlayerIndex].clientId;
-        
+                // const currentPlayerIndex = currentGame.clients.findIndex(client => client.clientId === currentGame.state.onFocus);
+                // const nextPlayerIndex = (currentPlayerIndex + 1) % currentGame.clients.length;
+                // currentGame.state.onFocus = currentGame.clients[nextPlayerIndex].clientId;
+                currentGame.state.diffused = true;
+                sendStatusUpdate(gameId);
                 // Start a new timer
-                currentGame.countdownInterval = setInterval(sendCountdownUpdate, 1000);
-            } else {
-                // Decrease the lives of the current player if the word is invalid
-                currentGame.clients.forEach(client => {
-                    if (client.clientId === currentGame.state.onFocus) {
-                        client.liveRemaining--;
-                    }
-                });
-        
-                // Send game update to all clients
-                const payload = {
-                    method: METHOD.DIFFUSE,
-                    game: currentGame,
-                };
-        
-                currentGame.clients.forEach(client => {
-                    clients[client.clientId].connection.send(JSON.stringify(payload));
-                });
-            }
+                currentGame.countdownInterval = setInterval(()=>sendStatusUpdate(gameId), 8000);
+            } 
             break;
         }
         
@@ -202,98 +187,103 @@ wsServer.on("request", request => {
 
 const beginGame = (gameId) => {
     const game = games[gameId];
-    const gameClients = game.clients;
-    let currentPlayerIndex = 0;
 
     // Function to send status update to all clients
-    const sendStatusUpdate = () => {
-        console.log("Current player index:", currentPlayerIndex);
 
-        // Check if the game has started
-    if (game.status === GAME_STATUS.STARTED) {
-        const currentPlayer = game.state.players.find(client => client.clientId === game.state.onFocus);
-        currentPlayer.liveRemaining--; // Decrement liveRemaining of the current player
-        console.log("game started",game);
-        // Check if the current player has no remaining lives
-        if (currentPlayer.liveRemaining === 0) {
-            // Handle the case where the current player has no remaining lives (e.g., remove player from the game)
-            game.status = GAME_STATUS.FINISHED;
-        }
-    } 
-
-        let nextPlayerIndex;
-        if (gameClients.length === 2) {
-            // If there are only two players, switch between them
-            nextPlayerIndex = currentPlayerIndex === 0 ? 1 : 0;
-        } else {
-            // For more than two players, calculate the next player index using modular arithmetic
-            nextPlayerIndex = (currentPlayerIndex + 1) % gameClients.length;
-        }
-
-        game.promt = generateRandomSubstring();
-        if(game.status === GAME_STATUS.STARTED){
-            game.state = {
-                prompt: game.promt,
-                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
-                players: game.state.players
-            }
-
-            console.log("on focus game started>>>", gameClients[nextPlayerIndex].clientId, nextPlayerIndex, game);
-
-        }
-
-        else if (game.status === GAME_STATUS.FINISHED){
-            game.state = {
-                prompt: game.promt,
-                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
-                players: game.state.players
-            }
-
-        }
-        else {
-            game.state = {
-                onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
-                players: gameClients.map(client => ({
-                    clientId: client.clientId,
-                    liveRemaining: 3 // Assuming 3 lives for each player initially
-                })),
-                prompt: game.promt
-        }
-
-        console.log("on focus game to start>>>", gameClients[nextPlayerIndex].clientId, nextPlayerIndex, game);
-
-
-      
-        }
-
-        // Construct payload for status update
-        const payload = {
-            method: METHOD.STATUS,
-            game: game 
-        };
-
-        // Send status update to all clients
-        game.clients.forEach(client => {
-            clients[client.clientId].connection.send(JSON.stringify(payload));
-        });
-
-        // Update currentPlayerIndex for the next turn
-        currentPlayerIndex = nextPlayerIndex;
-
-        if(game.status === GAME_STATUS.FINISHED){
-            clearInterval(game.countdownInterval);
-            return;
-        }
-    };
 
     // Send initial status update to all clients
-    sendStatusUpdate();
+    sendStatusUpdate(gameId);
 
     // Start the countdown for the game
     game.status = GAME_STATUS.STARTED;
-    game.countdownInterval = setInterval(sendStatusUpdate, 5000); // 5000 milliseconds = 5 seconds
+    game.countdownInterval = setInterval(()=>sendStatusUpdate(gameId), 8000); // 5000 milliseconds = 5 seconds
 
 
+};
+
+const sendStatusUpdate = (gameId) => {
+    const game = games[gameId];
+
+    let currentPlayerIndex = 0;
+    const gameClients = game.clients;
+
+if(game?.state?.onFocus){
+
+    currentPlayerIndex = game.clients.findIndex((client)=> client.clientId === game.state.onFocus);
+}
+
+    // Check if the game has started
+if (game.status === GAME_STATUS.STARTED) {
+    if(!game.state.diffused){
+    const currentPlayer = game.state.players.find(client => client.clientId === game.state.onFocus);
+    currentPlayer.liveRemaining--; // Decrement liveRemaining of the current player
+    // Check if the current player has no remaining lives
+    if (currentPlayer.liveRemaining === 0) {
+        // Handle the case where the current player has no remaining lives (e.g., remove player from the game)
+        game.status = GAME_STATUS.FINISHED;
+    }
+    game.state.diffused = false;
+}
+} 
+
+    let nextPlayerIndex;
+    if (gameClients.length === 2) {
+        // If there are only two players, switch between them
+        nextPlayerIndex = currentPlayerIndex === 0 ? 1 : 0;
+    } else {
+        // For more than two players, calculate the next player index using modular arithmetic
+        nextPlayerIndex = (currentPlayerIndex + 1) % gameClients.length;
+    }
+
+    game.promt = generateRandomSubstring().toUpperCase();
+    if(game.status === GAME_STATUS.STARTED){
+        game.state = {
+            prompt: game.promt,
+            onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
+            players: game.state.players
+        }
+
+
+    }
+
+    else if (game.status === GAME_STATUS.FINISHED){
+        game.state = {
+            prompt: game.promt,
+            onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
+            players: game.state.players
+        }
+
+    }
+    else {
+        game.state = {
+            onFocus: gameClients[nextPlayerIndex].clientId, // Next player gets focus
+            players: gameClients.map(client => ({
+                clientId: client.clientId,
+                liveRemaining: 3 // Assuming 3 lives for each player initially
+            })),
+            prompt: game.promt
+    }
+
+
+
+  
+    }
+
+    // Construct payload for status update
+    const payload = {
+        method: METHOD.STATUS,
+        game: game 
+    };
+
+    // Send status update to all clients
+    game.clients.forEach(client => {
+        clients[client.clientId].connection.send(JSON.stringify(payload));
+    });
+
+    if(game.status === GAME_STATUS.FINISHED){
+        clearInterval(game.countdownInterval);
+        return;
+    }
 };
 
 
@@ -325,14 +315,3 @@ function generateRandomSubstring() {
     } while (substringWordMap[randomSubstring].length === 0); // Ensure at least one word exists for the substring
     return randomSubstring;
 }
-
-// Main function
-function main() {
-    const randomSubstring = generateRandomSubstring();
-    console.log("Substring to find:", randomSubstring);
-    const userInput = 'asd';
-  
-}
-
-// Call the main function
-main();

@@ -21,7 +21,6 @@ export default function Home() {
 
   // webSocketRef.current
 
-  console.log("game id>>>>", gameId);
 
 
   const submitGuess =  useCallback(() => {
@@ -30,15 +29,14 @@ export default function Home() {
       "gameId": gameId,
       "word": guess
     }
+    
     ws.send(JSON.stringify(payload));
-    console.log(JSON.stringify(payload), gameId, guess)
   },[gameId, guess])
 
   useEffect(() => {
     const handleKeyPress = (event:any) => {
       if (event.key === 'Enter') {
         // Your logic here for handling Enter key press
-        console.log('Enter key pressed');
         submitGuess();
       }
     
@@ -54,7 +52,6 @@ export default function Home() {
 
 
   const createGame = () => {
-    console.log("cliceedddd");
     const payload = {
       "method": METHOD.CREATE,
       "clientId": clientId
@@ -152,17 +149,24 @@ const typeUpdate = (e:any) => {
       "typing": value
   };
 
+  console.log("tpy eupdaetae>>>>>>>>>");  
+
   ws.send(JSON.stringify(payload));
 };
 
 const debouncedTypeUpdate = (e:any) => {
-  setGuess(e.target.value)
-
-debounce((e:any)=>typeUpdate(e), 300); // Adjust debounce time as needed (300 milliseconds in this example)
+  setGuess(e.target.value);
+  typeUpdate(e);
 }
 
-
-  
+function findLivesById(clientId:string) {
+  for (const obj of gameState?.state?.players ?? []) {
+    if (obj.clientId === clientId) {
+      return obj.liveRemaining;
+    }
+  }
+  return null; // Return null if id is not found
+}
     
 
     const getOnboardUI = () => {
@@ -192,15 +196,15 @@ debounce((e:any)=>typeUpdate(e), 300); // Adjust debounce time as needed (300 mi
           <div>
             {player.clientId === clientId && <span>{'YOU -> '}</span>}
             {player.clientId}
+            <span style={{color:'red'}}>{findLivesById(player.clientId)}</span>
             </div>
           ))}
           { clientId === gameState?.state?.onFocus && <Input value={guess} onInputChange={debouncedTypeUpdate} /> }
           </div>
-          <div>{typing}</div>
-
+          <div style={{color:'lightgreen'}}>{typing}</div>
+          <div>WORD PROMPT: <span style={{fontWeight:'bold'}}>{gameState?.state?.prompt}</span></div>
           <div>
           WINNER IS:
-          {console.log(gameState)}
           {gameState.status === 'FINISHED' &&  <span>{gameState.state?.onFocus}</span>}
         </div>
         </>
